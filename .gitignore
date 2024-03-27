@@ -1,0 +1,19 @@
+# vscode settings 
+.vscode/* 
+
+*.pyc
+
+# ignore  data
+data/
+
+# ignore virtual environment files 
+.venv/
+
+# ignore checkpoint files
+**/.ipynb_checkpoints/
+
+## ignore hidden os files: (not sure what to put in for windows users )
+*.DS_Store
+.DS_Store
+*.swp
+.#*
