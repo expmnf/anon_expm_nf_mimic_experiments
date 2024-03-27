@@ -11,7 +11,7 @@ The code here provides implementation of our experiments where we test if we can
 ---
 
 ## Repository Setup 
-We used git-lfs for results files. Install git-lfs using your favorite package manager Run `git lfs install` to initiate it. 
+We used git-lfs for results files. Install git-lfs using your favorite package manager. Run `git lfs install` to initiate it. 
 
 We used pyenv for managing different versions of python and venv for our python virtual environment. 
 
@@ -44,8 +44,8 @@ Steps:
   - /.venv/ folder (.gitignored) holds pyvenv copies of python etc. Created  by you using the setup above. 
 
   - /data/* (gitignored) holds the mimic3 data, created by you. Below is what it should have after downloading mimic3 data and preprocessing it. 
-    - /mimic/ # note! this is a submodule
-        - all_hourly_data.h5 # gitignored, must be downloaded. See notebooks/mimic_preprocessing/README.md for info/directions
+    - /mimic/ 
+        - all_hourly_data.h5,  must be downloaded. See notebooks/mimic_preprocessing/README.md for info/directions
         - lvl2_l_inf_normalized.h5 l_infinity normalized mimic3 data, note! not pivoted on hours yet
         - lvl2_z_normalized.h5 z-score normalized mimic3 data. note! not pivoted on hours yet
         - Ys_mimic_extract.csv - First three columns are multi-indices for the patient, remaining columns are the targets. **Use `Ysr = pd.read_csv('data/mimic/Ys_mimic_extract.csv', index_col=[0,1,2])`** when you read it in! 
