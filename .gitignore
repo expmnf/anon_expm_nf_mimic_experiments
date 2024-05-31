@@ -4,7 +4,7 @@
 *.pyc
 
 # ignore  data
-data/
+
 
 # ignore virtual environment files 
 .venv/

@@ -10,7 +10,6 @@ from numpy import arange
 
 final_n = 10 # runs to do for final test
 
-
 ## hyperparam utils: 
 def _get_h_from_dict(h_key, hyperparameter_set, fixed):
     """used by functions below to get list of hyperparm dicts. 
@@ -43,7 +42,7 @@ def get_h_LR_nonpriv(target,  h_pass, loss, run, hyperparameter_set, use_full_tr
     """called in the run_nonprivate.py and the timing_benchmark_nonprivate.py scripts. 
     This returns the list of hyperparmeters for the kernel function
     """
-    if h_pass in [ "final", "benchmarks"]: 
+    if h_pass in [ "final", "shadow_models", "benchmarks"]: 
         refined_path = Path(folder, f'refined{run}')
         assert refined_path.exists(), f"{refined_path} does not exist!\n h_pass = 'final' and run = {run} requires {refined_path.as_posix()} to exist. (this is created when running run_nonprivate.py with h_pass = 'refined'.)" 
         nonpriv_df = pd.DataFrame.from_records( map( unjsonify,refined_path.rglob('*.json') ))
@@ -55,6 +54,7 @@ def get_h_LR_nonpriv(target,  h_pass, loss, run, hyperparameter_set, use_full_tr
                    'use_full_train', 'used_gpu'], axis = 1).to_dict('records')[0]        
             hyperparameter_set[p] = (final_n, clean)
             hyperparameter_set[(p[0], 'benchmarks', p[2])] = (1, non_priv_hyperparameter_set[p][1])
+            hyperparameter_set[(p[0], 'shadow_models', p[2])] = (1, non_priv_hyperparameter_set[p][1])
         
     fixed = {"target": target,
             "use_full_train": use_full_train,
@@ -70,7 +70,7 @@ def get_h_LR_dpsgd(target, h_pass, loss, epsilons, run, hyperparameter_set, use_
     """called in the run_dpsgd.py and the timing_benchmark_nonprivate.py scripts. 
     This returns the list of hyperparmeters for the kernel function
     """
-    if h_pass in [ "final", "benchmarks"]: 
+    if h_pass in [ "final", "mia", "benchmarks"]: 
         refined_path = Path(folder, f'refined{run}')
         assert refined_path.exists(), f"{refined_path} does not exist!\n h_pass = 'final' and run = {run} requires {refined_path.as_posix()} to exist. (this is created when running run_nonprivate.py with h_pass = 'refined'.)" 
         dpsgd_df = pd.DataFrame.from_records( map( unjsonify,refined_path.rglob('*.json') ))
@@ -107,7 +107,7 @@ def get_h_LR_expm(target, h_pass, epsilons, run, hyperparameter_set, use_full_tr
     """called in the run_expm.py and the timing_benchmark_nonprivate.py scripts. 
     This returns the list of hyperparmeters for the kernel function
     """
-    if h_pass in [ "final", "benchmarks"]:
+    if h_pass in [ "final", "mia", "benchmarks"]:
         refined_path = Path(folder, f'refined{run}')
         assert refined_path.exists(), f"{refined_path} does not exist!\n h_pass = 'final' and run = {run} requires {refined_path.as_posix()} to exist. (this is created when running run_nonprivate.py with h_pass = 'refined'.)" 
         expm_df = pd.DataFrame.from_records( map( unjsonify,refined_path.rglob('*.json') ))

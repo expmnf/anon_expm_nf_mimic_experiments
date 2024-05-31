@@ -1,4 +1,4 @@
-import copy, math, sys, os, pickle, time, pandas as pd, numpy as np, scipy.stats as ss
+import copy, math, sys, os, pickle, time, pandas as pd, numpy as np, scipy.stats as ss, scipy
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
@@ -14,10 +14,12 @@ sys.path.append(Path(".", "code", "mimic_experiment").as_posix())
 from normalizing_flows import * 
 from experiment_utils import *
 
+
 def to_3D_tensor(df):
     # from https://github.com/MLforHealth/MIMIC_Extract.git
     idx = pd.IndexSlice
     return np.dstack(list(df.loc[idx[:,:,:,i], :].values for i in sorted(set(df.index.get_level_values('hours_in')))))
+
 
 def prepare_dataloader(df, Ys, batch_size, shuffle=True, label_type = np.float32):
     # from https://github.com/MLforHealth/MIMIC_Extract.git
@@ -272,7 +274,7 @@ class ParallelGRUDWrapper(nn.Module):
 
     
 
-def predict_proba(model, params, dataloader, device, use_gpu):
+def predict_proba(model, params, dataloader, device, use_gpu, numpy = True):
     # with modifications from https://github.com/MLforHealth/MIMIC_Extract.git
     """
     Input:
@@ -288,7 +290,7 @@ def predict_proba(model, params, dataloader, device, use_gpu):
     labels        = []
     ethnicities   = []
     genders       = []
-    
+
     if params.ndim == 1:
         all_params = params.unsqueeze(0)
     else:
@@ -298,7 +300,6 @@ def predict_proba(model, params, dataloader, device, use_gpu):
     X_mean = model.X_mean
     for X, label in dataloader:
         # put batch on gpu (because we were running out of memory)
-        labels.append(label.detach().cpu().data.numpy())
         if use_gpu:
             X = X.to(device)
             label = label.to(device)
@@ -324,7 +325,12 @@ def predict_proba(model, params, dataloader, device, use_gpu):
         
         prob = model(all_params, X, X_last_obsv, Mask, Delta)
         
-        probabilities.append(prob.detach().cpu().data.numpy())
+        if numpy:
+            probabilities.append(prob.detach().cpu().data.numpy())
+            labels.append(label.detach().cpu().data.numpy())
+        else:
+            probabilities.append(prob.detach())
+            labels.append(label.detach())
 
     return probabilities, labels
 
@@ -464,6 +470,7 @@ def get_dataloaders(X_train, label_train, X_test, label_test, data_batch_size):
     test_dataloader = create_dataloader(X_test, label_test, batch_size=data_batch_size)
     return train_dataloader, test_dataloader
 
+
 def create_grud_model(h, X_mean, data_batch_size, device_type, use_gpu):
     """
         Creates GRUD model
@@ -474,6 +481,7 @@ def create_grud_model(h, X_mean, data_batch_size, device_type, use_gpu):
     grud_wrapper = ParallelGRUDWrapper(**base_params)
     return grud_wrapper
 
+
 def evaluate_nf(nf_model, model_wrapper, h, test_dataloader, z_size, sample_std, device_type, use_gpu):
     """
         Evaluates normalizing flow model by first pushing samples through normalizing flow model 
@@ -483,13 +491,45 @@ def evaluate_nf(nf_model, model_wrapper, h, test_dataloader, z_size, sample_std,
         samples = random_normal_samples(1000, z_size, sample_std, device = device_type) # l by X.shape[0] + 1 tensor, {u_i: i = 1,..,l} sampled from base. 
         B, _ = nf_model.forward(samples) 
         B.detach()
-        # TODO: how should we save the model? 
-        #h['betas'] = B.tolist() I'm not sure we should save all these... but we probably should save the flow?
         h['aucs'] = get_auc_with_wrapper(model_wrapper, B, test_dataloader, device = device_type, use_gpu = use_gpu) # puts AUC for each sampled pararamter set into dict h
         x = pd.Series(h['aucs'])
         h['auc_ave']= x.mean()  # stores mean AUC across all samples 
 
     return h
+
+
+# this is implemented assuming binary classification
+def logit_confs_stable_expm(model_wrapper, b, dataloader, device, use_gpu):
+    probabilities, labels = predict_proba(model_wrapper, b, dataloader, device = device, use_gpu = use_gpu, numpy = False)
+
+    y_preds = torch.concatenate(probabilities, axis = 1).squeeze()
+    y  = torch.concatenate(labels).squeeze()
+    # get best threhold 
+#    bce = torch.nn.BCELoss(reduction = 'none')  
+    bce = torch.nn.BCEWithLogitsLoss(reduction = 'none')
+    loss = -bce(y_preds, y)
+    loss_y_prime = -bce(y_preds, 1-y) # flip the labels to show the loss for the remaining class
+    # log(exp(loss)) - log(1-exp(loss))
+    # = loss - log(exp(loss_y_prime))
+    # = loss - loss_y_prime 
+    return loss - loss_y_prime # probably more stable...
+
+# for auditing
+def score(model_wrapper, b, loss_fn, dataloader, device, use_gpu):
+    probabilities, labels = predict_proba(model_wrapper, b, dataloader, device = device, use_gpu = use_gpu, numpy = False)
+    y_preds = torch.concatenate(probabilities, axis = 1).squeeze()
+    y  = torch.concatenate(labels).squeeze()
+    return loss_fn(y_preds, y)
+
+def logit_confs_grud_hinge_expm(model_wrapper, b, dataloader, device, use_gpu):
+    # section 4A hinge loss 
+    grud_model.apply_sigmoid = False # get output before sigmoid is applied
+    probabilities, labels = predict_proba(model_wrapper, b, dataloader, device = device, use_gpu = use_gpu, numpy = False)
+#    z_y = torch.concatenate(probabilities).squeeze()
+    z_y = torch.concatenate(probabilities, axis = 1).squeeze()
+
+    return 2*z_y-1
+
 
 
 

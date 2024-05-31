@@ -106,7 +106,6 @@ def load_data(target, level = 3, normalization = 'l_inf', device_type = 'cpu', u
     return df_train,  df_test, Ys_train,  Ys_test, training_data, testing_data
 
 
-
 def prepare_data(X, labels, batch_size):
     """
         Puts data into nf_batches
@@ -143,6 +142,19 @@ class DictDist(): # pass in a dict, but values must be the Choice class. One met
         return out
     def __repr__(self):
         return pformat(self.dict_of_rvs, width = 1)
+
+
+def get_logistic_model(b, input_dim, output_dim = 1, use_gpu = False, device_id = 'cpu'):
+    """ Make a Logistic model from model parameters sampled from an NF """
+    lr_model = LogisticRegression(input_dim, output_dim)
+    state_dict = {
+        'linear.weight' : b[:-1].reshape([1, input_dim]),
+        'linear.bias' : b[-1].reshape([1])
+        }
+    lr_model.load_state_dict(state_dict)
+    if use_gpu:
+        lr_model.to(device_id)
+    return lr_model
 
     
 ## accuracy results functions
@@ -582,10 +594,40 @@ def bm_noise_multiplier(h, sample_rate):
      return noise_multiplier
 
 
+# mia utils
+
+def logit_confs(model, X, y):
+    y_preds = model(X).squeeze()
+    bce = torch.nn.BCELoss(reduction = 'none')  
+    loss = -bce(y_preds, y)
+    confs = torch.exp(loss)
+    return loss - torch.log(1-confs) # should be numerical stable...
+
+# this is implemented assuming binary classification
+def logit_confs_stable(model, X, y):
+    y_preds = model(X).squeeze()
+    # get best threhold 
+    bce = torch.nn.BCELoss(reduction = 'none')  
+    loss = -bce(y_preds, y)
+    loss_y_prime = -bce(y_preds, 1-y) # flip the labels to show the loss for the remaining class
+    # log(exp(loss)) - log(1-exp(loss))
+    # = loss - log(exp(loss_y_prime))
+    # = loss - loss_y_prime 
+    return loss - loss_y_prime # probably more stable...
+
+def logit_confs_lr_hinge(model, X, y):
+    z_y = model.linear(X).squeeze()
+    # section 4A hinge loss 
+    # l(x,y) = z_y - max_{y' != y} z_{y'}
+    # the output of our linear layer is 1-d so we compute
+    # l(x,y) = z_y - (1- z_y) = 2z_y - 1
+    return 2*z_y-1
 
 
+def score(model, loss_fn, X, y):
+    y_preds = model(X).squeeze()
 
-
+    return loss_fn(y_preds, y)
 
 
 

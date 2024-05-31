@@ -32,11 +32,11 @@ def prepare_dataloader(df, Ys, batch_size, shuffle=True, label_type = np.float32
     return utils.DataLoader(dataset, int(batch_size), shuffle=shuffle, drop_last = True)
 
 # same as above but doesn't use a dataframe
-def create_dataloader(X, label, batch_size, shuffle=True, label_type = torch.float32):
+def create_dataloader(X, label, batch_size, shuffle=True, label_type = torch.float32, drop_last = True):
     l = label.type(label_type)
     dataset = utils.TensorDataset(X, l)
     
-    return utils.DataLoader(dataset, int(batch_size), shuffle=shuffle, drop_last = True)
+    return utils.DataLoader(dataset, int(batch_size), shuffle=shuffle, drop_last = drop_last)
 
 
 
@@ -388,7 +388,41 @@ def Train_Model_DPSGD(pre_model, loss_fn, pre_train_dataloader, noise_multiplier
     return priv_model, niter_per_epoch, privacy_engine#, [losses_train, losses_epochs_train]
  
 
-def predict_proba(model, dataloader):
+# this is implemented assuming binary classification
+def logit_confs_stable(grud_model, dataloader):
+    probabilities, labels = predict_proba(grud_model, dataloader, numpy = False)
+    y_preds = torch.concatenate(probabilities).squeeze()
+    y  = torch.concatenate(labels).squeeze()
+    # get best threhold 
+#    bce = torch.nn.BCELoss(reduction = 'none')  
+    bce = torch.nn.BCEWithLogitsLoss(reduction = 'none')
+    loss = -bce(y_preds, y)
+    loss_y_prime = -bce(y_preds, 1-y) # flip the labels to show the loss for the remaining class
+    # log(exp(loss)) - log(1-exp(loss))
+    # = loss - log(exp(loss_y_prime))
+    # = loss - loss_y_prime 
+    return loss - loss_y_prime # probably more stable...
+
+def logit_confs_grud_hinge(grud_model, dataloader):
+    # section 4A hinge loss 
+    grud_model.apply_sigmoid = False # get output before sigmoid is applied
+    probabilities, labels = predict_proba(grud_model, dataloader, numpy = False)
+    z_y = torch.concatenate(probabilities).squeeze()
+
+    return 2*z_y-1
+
+
+def score(grud_model, loss_fn, dataloader):
+    probabilities, labels = predict_proba(grud_model, dataloader, numpy = False)
+    y_preds = torch.concatenate(probabilities).squeeze()
+    y  = torch.concatenate(labels).squeeze()
+
+    return loss_fn(y_preds, y)
+
+
+
+
+def predict_proba(model, dataloader, numpy = True):
     # with modifications from https://github.com/MLforHealth/MIMIC_Extract.git
     """
     Input:
@@ -427,10 +461,13 @@ def predict_proba(model, dataloader):
         convert_to_tensor=lambda x: Variable(x)
         X, X_last_obsv, Mask, Delta, label  = map(convert_to_tensor, [measurement, measurement_last_obsv, mask, time_, label])
 
-        
         prob = model(X, X_last_obsv, Mask, Delta)
         
-        probabilities.append(prob.detach().cpu().data.numpy())
-        labels.append(label.detach().cpu().data.numpy())
+        if numpy:
+            probabilities.append(prob.detach().cpu().data.numpy())
+            labels.append(label.detach().cpu().data.numpy())
+        else:
+            probabilities.append(prob.detach())
+            labels.append(label.detach())
 
     return probabilities, labels

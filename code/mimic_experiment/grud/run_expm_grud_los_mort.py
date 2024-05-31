@@ -90,7 +90,7 @@ def kernel_fn(h, X_train, label_train, X_test, label_test, X_mean, run_folder, v
 
     train_dataloader, test_dataloader = get_dataloaders(X_train, label_train, X_test, 
                                                         label_test, data_batch_size)
-       ## setup Sylvester NF
+    ## setup Sylvester NF
     z_size = model_wrapper.nparams
     print("Number of params to sample: ", z_size)
 
@@ -117,8 +117,8 @@ def kernel_fn(h, X_train, label_train, X_test, label_test, X_mean, run_folder, v
     
     ## save the training losses data: 
     filename = f"results_epsilon_{h['epsilon']}_m_{h['m']}_hh_{h['hh']}_epochs_{h['epochs']}_lr_{h['learning_rate']}_momentum_{h['momentum']}_lam_{h['lam']}_batch_size_{h['batch_size']}_seed_{h['seed']}.json"
-#
-    # %% now get AUC stats for parameters sampled from this trained NF
+
+    # now get AUC stats for parameters sampled from this trained NF
     print(f'\n\n---Script run_expm_los_mort_parallelized_gpu.py: ------Saving results data ...')
     jsonify(h, Path(results_folder, filename))
 

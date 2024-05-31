@@ -11,9 +11,7 @@ The code here provides implementation of our experiments where we test if we can
 ---
 
 ## Repository Setup 
-We used git-lfs for results files. Install git-lfs using your favorite package manager. Run `git lfs install` to initiate it. 
-
-We used pyenv for managing different versions of python and venv for our python virtual environment. 
+We used pyenv for managing different versions of python and venv for our python virtual envrionment. 
 
 Quick background and useful commands appear at the bottom of this readme. 
 
@@ -43,9 +41,9 @@ Steps:
 ## Folder structure is 
   - /.venv/ folder (.gitignored) holds pyvenv copies of python etc. Created  by you using the setup above. 
 
-  - /data/* (gitignored) holds the mimic3 data, created by you. Below is what it should have after downloading mimic3 data and preprocessing it. 
-    - /mimic/ 
-        - all_hourly_data.h5,  must be downloaded. See notebooks/mimic_preprocessing/README.md for info/directions
+  - /data/* (gitignored) holds the mimic3 data (not included, instructions below). Below is what it should have after downloading mimic3 data and preprocessing it. 
+    - /mimic/ # note! this is a submodule
+        - all_hourly_data.h5 # gitignored, must be downloaded. See notebooks/mimic_preprocessing/README.md for info/directions
         - lvl2_l_inf_normalized.h5 l_infinity normalized mimic3 data, note! not pivoted on hours yet
         - lvl2_z_normalized.h5 z-score normalized mimic3 data. note! not pivoted on hours yet
         - Ys_mimic_extract.csv - First three columns are multi-indices for the patient, remaining columns are the targets. **Use `Ysr = pd.read_csv('data/mimic/Ys_mimic_extract.csv', index_col=[0,1,2])`** when you read it in! 
@@ -138,6 +136,13 @@ Output will appear in results folder according to the path in line ~215: `RESULT
 
 Hyperparmeter search spaces we used are in the `hyperparm_sets.py` scripts. 
 
+### Membership Inference and Privacy Auditing Results:
+To begin the membership inference attack, each <model> (logistic regression/grud) need shadow models trained. To train shadow models, one will use `code/mimic_experiment/<model>/run_mia_shadow_models.py`. Two methods hinge/stable are implemented for computing logit confidences per example (both in/out examples) and a flag at the top determines which will be used (our reported experiments use stable). The number of shadow models can also be changed (we default to 1000). The shadow models will use the best non-private hyperparameters found from the hyperparameter searches from the Accuracy and privacy results Section (i.e., that hyperparameter search must be done prior to running this code).
+
+Once the shadow models have been trained, to attack and audit for target models for each training <type> (nonprivate/dpsgd/expm) and each <model> (logistic regression/grud) experiments, one will use `code/mimic_experiment/<model>/mia_<type>.py`. These target models will use the best hyperparameters found during their respective hyperparameter search runs done previously. The number of target models and what confidence method to use can be set at the top. If fewer than 1000 shadow models were trained, `N_shadow_models` must be set to the correct number. 
+
+Output will appear in the results folder according to the path set in line ~210: `RESULTS_FOLDER = Path(FOLDER, f"{conf_type}_{N_shadow_models}")` which is printed upon writing.
+
 ### Timing benchmark results 
 To create the timing benchmarking results for each  training <type> (nonprivate/dpsgd/expm) an each <model> (logistic_regression/grud) experiments, one will run `code/mimic_experiment/<model>/timing_benchmark_<type>.py`, e.g., for dpsgd training on logistic_regression we would open `code/mimic_experiment/logistic_regression/timing_benchmark_dpsgd.py`. 
 
@@ -152,4 +157,11 @@ See Pytorch Timer source code if desired:
 ### Plotting results: 
 For each <model> (logistic regression /grud) there is a plotting code file that can be run to create the result plots, namely `/code/mimic_experiment/<model>/plot_results.py`
 
+### Plots of ExpM and NF Densities
+See the two notebooks 
+- /notebooks/1d_expm_plots.ipynb ## expm plots in 1D for varying epsilon 
+- /3d-plots-expm-nf.ipynb ## Expm and NF plots for easy data. 
+
+### UQ Experiment 
+- run `python code/mimic_experiment/logistic_regression/uq_example_lr.py`
 Happy reproducing! 

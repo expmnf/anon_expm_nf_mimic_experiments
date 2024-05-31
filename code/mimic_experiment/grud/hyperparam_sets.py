@@ -51,19 +51,19 @@ def _get_h_from_dict(h_key, hyperparameter_set, fixed):
 def get_h_grud_nonpriv(target, h_pass, loss, use_bn, run, hyperparameter_set, use_full_train,
                        use_gpu, run_folder, folder = GRUD_BASELINE_RESULTS_FOLDER, final_n = final_n):
     ## AUTOMATICALLY get best hyperparameters for final run
-    if h_pass in ["final", "benchmarks"]:
+    if h_pass in ["final", "shadow_models", "benchmarks"]:
         refined_path = Path(folder, f'refined{run}')
         assert refined_path.exists(), f"{refined_path} does not exist! h_pass = 'final' and run = {run} requires {refined_path.as_posix()} to exist (this is created with h_pass = 'refined')"
-        nonpriv_refined_df = get_results_df(folder, 'refined', 0, target)
+        nonpriv_refined_df = get_results_df(folder, 'refined', run, target)
         p = (target, 'final', loss, use_bn)
         task_df = nonpriv_refined_df[(nonpriv_refined_df.use_bn == p[3]) & (nonpriv_refined_df.loss == p[2])]
         best = task_df.nlargest(1, 'auc') 
         clean = best.drop(labels = ['accuracy', 'aps', 'auc', 'dist_to_[0,1]', 'f1', 'fpr',
                'loss', 'model_id', 'prec', 'seed', 'target', 'thresh', 'tpr',
                'use_full_train', 'used_gpu'], axis = 1).to_dict('records')[0]        
-        print(clean)
         non_priv_hyperparameter_set[p] = (final_n, clean)
         non_priv_hyperparameter_set[(p[0], 'benchmarks', p[2], p[3])] = (1, non_priv_hyperparameter_set[p][1])
+        non_priv_hyperparameter_set[(p[0], 'shadow_models', p[2], p[3])] = (1, non_priv_hyperparameter_set[p][1])
 
     # add fixed hyperparameters
     fixed = {"target": target,
